@@ -1,0 +1,108 @@
+---
+title: "Transmission effect on MPG"
+author: "Luis J. Villalobos"
+date: "15 de febrero de 2016"
+output: html_document
+---
+
+
+```{r setup,message=FALSE, include=FALSE}
+require(ggplot2)
+require(data.table)
+require(dplyr)
+require(datasets)
+require(graphics)
+require(grid)
+require(gridExtra)
+set.seed(230390)
+data("mtcars")
+```
+
+## Introduction & Executive Summary
+
+## Exploratory Data Analysis
+This scatterplot shows us the Miles per Gallon of all the cars in the dataset and colors them by Transmission type. It shows that the cars with more miles per gallon are the cars with Manual Transmission and we are going to asses that assumption with linear models. 
+```{r echo=FALSE}
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$am <- factor(mtcars$am)
+levels(mtcars$am) <- c("Auto","Manual")
+g <- ggplot(mtcars,aes(x=1:32,y=mtcars$mpg,color=mtcars$am))
+g = g+geom_point()
+g = g+scale_x_discrete(name="Car",labels=rownames(mtcars))
+g = g + theme(axis.text.x=element_text(angle= 90,hjust=1))
+g2 <- ggplot(mtcars,aes(x=mtcars$am,y=mtcars$mpg,fill=mtcars$am)) + geom_boxplot()
+g
+```
+
+Here we have another plot that relates the two groups of transmissions, we can see that the range of values for the miles per gallon in the Automatic Transmission is more steady and narrow than the Manual one, but it is also clear that the median and the overall range of the Manual cars is higher.
+
+```{r echo=FALSE}
+g2
+```
+
+## Model Selection and Analysis
+
+We will follow a nested model approach involving the transmission, the number of cylinders, the weight and the horse power as possible regressors in order to obtain a model of 3 regressors.
+
+```{r}
+fit1 <- lm(mpg ~ am,data=mtcars) #Just Transmision
+fit2 <- lm(mpg~am+cyl,mtcars) #Transmision+Cylinders
+fit3 <- lm(mpg~am+cyl+wt,mtcars) #Transmission+Cylinders+Weight
+fit4 <- lm(mpg~am+cyl+hp,mtcars) #Transmission+Cylinders+Horse power
+```
+
+First we will perform an anova to analyse the effect of using the wright of the car vs the horsepower.
+
+```{r}
+anova(fit1,fit2,fit3)
+anova(fit1,fit2,fit4)
+```
+
+We can observe that the Residual sum of squares is smaller in the use of Weight of the overall sum of squares in the usage of Horsepower is less. However the two combinations reveal their significance to the explanation of a possible relationship. Exploring the different measures of influence we can observe that the outliers for both models have effects in the covariance ratio, thus affecting the variance and covariances of the coefficents. The outliers are different for each model.
+
+```{r echo=F}
+fit3.influence <- influence.measures(fit3)
+fit4.influence <- influence.measures(fit4)
+fit4.influentials <- fit4.influence$is.inf[which(fit4.influence$is.inf[,"cov.r"]==T),]
+fit3.influentials <- fit3.influence$is.inf[which(fit3.influence$is.inf[,"cov.r"]==T),]
+print("Transmission+Cylinders+Weight Outliers")
+rownames(fit3.influentials)
+print("Transmission+Cylinders+Horse power Outliers")
+rownames(fit4.influentials)
+```
+## Residual Plot
+
+In order to delve further on the decision we proceed with a residual analysis. Comparing the qqplot of standarized residuals of each model to discard non normality in the residuals.
+
+```{r echo=FALSE}
+fit4.qnorm = qqnorm(rstandard(fit4),plot.it = F)
+fit3.qnorm = qqnorm(rstandard(fit3),plot.it = F)
+plot(range(fit3.qnorm$x,fit4.qnorm$x),range(fit3.qnorm$y,fit4.qnorm$y),type = "n")
+points(fit3.qnorm)
+points(fit4.qnorm,col ="red",pch=3)
+abline(lm(fit3.qnorm$y~fit3.qnorm$x))
+abline(lm(fit4.qnorm$y~fit4.qnorm$x),col="red")
+```
+
+The residuals being plotted do not have heavily influential outliers and they seem to respond to a normal distribution. So we perform a comparison of the Rsquared of the models being discussed
+
+```{r}
+rsquared<- rbind(summary(fit3)$adj.r.squared,summary(fit4)$adj.r.squared)
+rownames(rsquared) <- c("fit3","fit4")
+colnames(rsquared) <- c("rsquared")
+rsquared
+```
+
+After observing the adjusted rsquared of the 2 initial models, we select the combination of Transmission, Cylinders and Weight. 
+
+## Coefficient Interpretation
+
+```{r}
+summary(fit3)
+```
+
+## Conclusions
+
+
+**"Is an automatic or manual transmission better for MPG"
+**"Quantify the MPG difference between automatic and manual transmissions"
